@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/cupertino.dart';
 import 'package:mqtt_client/mqtt_client.dart';
@@ -6,15 +7,29 @@ import 'package:mqtt_client/mqtt_server_client.dart';
 import 'package:provider/provider.dart';
 import 'package:smarthome/providers/lampu_provider.dart';
 
+String generateRandomString(int length) {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  final random = Random();
+  return String.fromCharCodes(
+    Iterable.generate(
+      length,
+          (_) => characters.codeUnitAt(random.nextInt(characters.length)),
+    ),
+  );
+}
+
+
+String x = generateRandomString(10);
+
 final client = MqttServerClient(
     '2e51f35445d7476b8552cdfb74edc1d6.s1.eu.hivemq.cloud',
-    'flutter_client_1231231');
+    'flutter_client_$x');
 var pongCount = 0;
 
 Future<void> jalankanMqtt(BuildContext context) async {
   client.logging(on: true);
 
-  client.keepAlivePeriod = 20;
+  client.keepAlivePeriod = 5;
 
   client.connectTimeoutPeriod = 2000; // milliseconds
 
@@ -27,7 +42,6 @@ Future<void> jalankanMqtt(BuildContext context) async {
   client.port = 8883;
   client.logging(on: true);
   client.setProtocolV311();
-  client.keepAlivePeriod = 20;
   client.secure = true;
   client.onBadCertificate = (dynamic cert) => true;
   client.connectionMessage = MqttConnectMessage()
@@ -65,6 +79,7 @@ Future<void> jalankanMqtt(BuildContext context) async {
   });
 }
 
+
 kirimPesan(String pesan) {
   const pubTopic = "hematech/led_control";
   final builder = MqttClientPayloadBuilder();
@@ -86,6 +101,7 @@ void onSubscribed(String topic) {
 }
 
 void onDisconnected() {
+  reconnect();
   print('EXAMPLE::OnDisconnected client callback - Client disconnection');
   if (client.connectionStatus!.disconnectionOrigin ==
       MqttDisconnectionOrigin.solicited) {
@@ -105,4 +121,15 @@ void onDisconnected() {
 void onConnected() {
   print(
       'EXAMPLE::OnConnected client callback - Client connection was successful');
+}
+
+void reconnect() async {
+  await Future.delayed(Duration(seconds: 5));
+  try {
+    await client.connect();
+  } on NoConnectionException catch (_) {
+    client.disconnect();
+  } on SocketException catch (_) {
+    client.disconnect();
+  }
 }
